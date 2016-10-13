@@ -1,10 +1,11 @@
 source("script/KEGGLoader.R")
 source("script/CausalityAnalysisWorkflow.R")
 
+#load data for gene database and matrix for logFC and expression value
 load("data/database.dat")
 load("data/DESeq2resultBDC.dat")
 
-
+#get pathway network from KEGG
 wntPathway <- getPathwayRelationshipTable("hsa04310")
 newWNTPathway <- getEnsemblBasedRelTable(wntPathway)
 WNTadj <- createAdjacencyMatrix(newWNTPathway,TRUE)
@@ -12,6 +13,8 @@ separatedWNTadj <- separateAdjMatrix(WNTadj)
 canonPathway <- separatedWNTadj[[3]]
 
 logFCData <- FC_BDC_Normal
+#check for one gene, LEF1
+#ProcessTF is the function that calculate the regression between target and TFs gene
 convertGeneID("LEF1","symbol","ensembl")
 resultAnalysis <- ProcessTF("ENSG00000138795",canonPathway)
 

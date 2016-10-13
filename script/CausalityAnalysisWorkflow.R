@@ -1,11 +1,11 @@
 library(DESeq2)
 
-
+#calculate TFs for target gene
 ProcessTF <- function(Target,graph){
   message(paste("Processing gene ",Target))
   allTF <- getTF(Target,graph)
   if(is.null(allTF)){
-    print("masuk null")
+    print("No TF found")
     return(NULL)
   }
   inhibitor <- c()
@@ -13,15 +13,19 @@ ProcessTF <- function(Target,graph){
   unknown <- c()
   
   for(tf.id in allTF){
+	#filter out data that is not exist in the expression table
+	#it is possible data from KEGG contain gene/compound that is not defined in ensembl database
     if(identical(tf.id,character(0))){
       next
     }
     if(!tf.id %in% rownames(logFCData)){
       next
     }
+	#filter TF that is not differentially expressed
     if(abs(logFCData[tf.id,"log2FoldChange"])<0.65){
       next
     }
+	#check if activator or inhibitor
     type <- getTFType(tf.id,Target,graph)
     
     if(type%in%c(3,5,9)){
@@ -31,15 +35,18 @@ ProcessTF <- function(Target,graph){
     }else{
       unknown <- c(unknown,tf.id)
     }
-    
   }
-  inhibitorAnalysis <- checkInhibitor(inhibitor,Target)
+  
+  #inhibitor variable will contain with TF that is categorized as inhibitor
+  #activator variable will contain with TF that is categorized as activator
+  inhibitorAnalysis <- checkInhibitor(inhibitor,Target)  
   activatorAnalysis <- checkActivator(activator,Target)
   output <- list(inhibitorAnalysis,activatorAnalysis)
   output
 }
 
 checkInhibitor <- function(inhibitor,Target){
+	#check the inputted inhibitor and splitted the inputted inhibitor into 2, significant and not
   logTarget <- logFCData[Target,"log2FoldChange"][1]
   
   significant <- c()
@@ -54,6 +61,9 @@ checkInhibitor <- function(inhibitor,Target){
     }
   }
   
+  #return value of this function is a list contains 2 vectors
+  #1st vector is the significant inhibitor that is found after calculation
+  #2nd vector is the remaining inhibitor that we found not significant
   cause <- list()
   cause[[1]]<-significant
   cause[[2]]<-nonsignificant
@@ -61,8 +71,15 @@ checkInhibitor <- function(inhibitor,Target){
 }
 
 checkActivator <- function(activator,Target){
+  #do the regression of the inputted activator
+  #the outpur is a list contains 3 vectors
+  #1st vector is the gene names that are found significant (used in the linear regression model)
+  #2nd vector is the gene names that are found not significant (not used in the linear regression model)
+  #3rd vector is the summary of the linear regression of the most significant model (genes from 1st vector)
+  
   
   oriactivator <- activator
+  #filter the inputted activator
   activator <- filterActivator(activator,Target)
   
   if(length(activator)<1){
@@ -72,15 +89,19 @@ checkActivator <- function(activator,Target){
     res[[3]]<-NULL
     return(res)
   }
+  
+  #use ensemblID, used to be changing the symbol but since already use the ensemblID, just ignore
   activatorEnsembl <- c()
   for (a in activator){
     activatorEnsembl <- c(activatorEnsembl,a)
   }
+  
   activator <- activatorEnsembl
   max <- -1
   selected <- c()
   LMSummary <- NULL
   for(i in length(activator):1){
+	#brute force to get all possible combination of TFs
     list <- enum.choose(activator,i)
     for(j in 1:length(list)){
       formula <- paste(Target,paste(list[[j]],collapse="+"),sep="~")
